@@ -5,6 +5,7 @@ import { GrpcAuthModule } from './common/guard/grpc-auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { configuration } from './config/configuration';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CommentModule } from './comment/comment.module';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
     ConfigModule.forRoot({
       envFilePath:
-        '/home/user/NodeJs /Nest Framework/leave-management/bin/env.local',
+        '/home/user/NodeJs/Demo Project/Social_Media/interaction/bin/env.local',
       isGlobal: true,
       cache: true,
       load: [configuration],
@@ -21,9 +22,11 @@ import { MongooseModule } from '@nestjs/mongoose';
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
+        console.log(configService.get<string>('MONGO_URI'))
         return { uri: configService.get<string>('MONGO_URI') };
       },
     }),
+    CommentModule,
   ],
   providers: [GrpcAuthGuard]
 })

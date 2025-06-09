@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package post;
+
+service PostService {
+  rpc ValidatePost (ValidatePostRequest) returns (ValidatePostResponse);
+}
+
+message ValidatePostRequest {
+  string postId = 1;
+}
+
+message ValidatePostResponse {
+  bool exists = 1;
+  string userId = 2; // post owner id (for notification)
+}

@@ -1,22 +1,46 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { React, ReactDocument } from './schema/react.schema';
-import { ReactDto } from '../dto/react.dto';
-import { UnreactDto } from '../dto/unreact.dto';
+import { ReactDto } from './dto/react.dto';
+import { UnreactDto } from './dto/unreact.dto';
+import { KafkaProducerService } from 'src/kafka/kafka.service';
 
 @Injectable()
 export class ReactService {
-  constructor(@InjectModel(React.name) private reactModel: Model<ReactDocument>) {}
+
+  constructor(
+    @InjectModel(React.name) private reactModel: Model<ReactDocument>,
+    private readonly kafkaProducerService: KafkaProducerService,
+  ) {}
+  
 
   async reactToPost(userId: string, dto: ReactDto) {
     const { postId, type } = dto;
+
+    // 1. Validate post existence via gRPC
+    // try {
+    //   const result = await lastValueFrom(
+    //     this.postService.ValidatePost({ postId }),
+    //   );
+
+    //   if (!result?.exists) {
+    //     throw new NotFoundException('Post does not exist');
+    //   }
+    // } catch (err) {
+    //   throw new NotFoundException('Post validation failed');
+    // }
+
+    // 2. Save or update the reaction
     let like = await this.reactModel.findOne({ postId });
 
     if (!like) {
       like = await this.reactModel.create({
         postId,
-        reactions: [{ userId, type }],
+        reactions: [{ userId, type, reactedAt: new Date() }],
       });
     } else {
       const index = like.reactions.findIndex(r => r.userId === userId);
@@ -28,6 +52,9 @@ export class ReactService {
       }
       await like.save();
     }
+    const postOwnerId = 'some-user-id';
+    console.log("reacted")
+    await this.kafkaProducerService.emitLikeEvent(postId, userId, postOwnerId);
 
     return { message: 'Reaction updated successfully' };
   }

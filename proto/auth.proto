@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package auth;
+
+service AuthService {
+  rpc ValidateToken (TokenValidationRequest) returns (UserPayload);
+}
+
+message TokenValidationRequest {
+  string access_token = 1;
+}
+
+message UserPayload {
+  string userId = 1;
+  string email = 2;
+  string role = 3;
+  int64 issuedAt = 4;
+  int64 expiresAt = 5;
+}

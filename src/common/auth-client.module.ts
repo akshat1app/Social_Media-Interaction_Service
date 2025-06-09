@@ -10,8 +10,8 @@ import { join } from 'path';
         transport: Transport.GRPC,
         options: {
           package: 'auth',
-          protoPath: join(__dirname, '../../../proto/user.proto'),
-          url: 'localhost:5000',
+          protoPath: join(__dirname, '../../../proto/auth.proto'),
+          url: 'localhost:50052',
           loader: {
             keepCase: true,
           },
