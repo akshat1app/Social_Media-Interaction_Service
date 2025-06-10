@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -18,6 +19,25 @@ export class CommentService {
   ) {}
 
   async createComment(userId: string, dto: CreateCommentDto) {
+    console.log('typeof postId:', typeof dto.postId);
+    console.log('value of postId:', dto.postId);
+  
+    // Validate required IDs
+    if (!Types.ObjectId.isValid(dto.postId)) {
+      throw new BadRequestException('Invalid postId');
+    }
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new BadRequestException('Invalid userId');
+    }
+  
+    // Validate optional IDs
+    if (dto.parentCommentId && !Types.ObjectId.isValid(dto.parentCommentId)) {
+      throw new BadRequestException('Invalid parentCommentId');
+    }
+    if (dto.replyToUserId && !Types.ObjectId.isValid(dto.replyToUserId)) {
+      throw new BadRequestException('Invalid replyToUserId');
+    }
+  
     const comment = await this.commentModel.create({
       postId: new Types.ObjectId(dto.postId),
       userId: new Types.ObjectId(userId),
@@ -29,8 +49,12 @@ export class CommentService {
         ? new Types.ObjectId(dto.replyToUserId)
         : null,
     });
-
-    await this.kafkaService.emitCommentEvent(dto.postId, userId, 'new_comment');
+    const postOwnerId = 'some_user_id'
+    if (dto.parentCommentId && dto.replyToUserId){
+      await this.kafkaService.emitReplyEvent(dto.postId, userId, postOwnerId, dto.parentCommentId, dto.replyToUserId);
+    }else{
+      await this.kafkaService.emitCommentEvent(dto.postId, userId, postOwnerId);
+    }
     return comment;
   }
 

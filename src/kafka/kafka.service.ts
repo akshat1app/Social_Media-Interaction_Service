@@ -26,35 +26,50 @@ export class KafkaProducerService implements OnModuleInit {
 
   async onModuleInit() {
     await this.client.connect();
-    console.log('✅ Kafka producer connected');
+    console.log('Kafka producer connected');
   }
 
   async emitLikeEvent(postId: string, userId: string, postOwnerId: string) {
     try {
-      console.log('📤 Sending message to Kafka:', { postId, userId, postOwnerId });
+      console.log('Sending message to Kafka:', { postId, userId, postOwnerId });
       const message = {
         postId,
         userId,
         postOwnerId
       };
-      await lastValueFrom(this.client.emit('post', message));
-      console.log('✅ Message sent successfully');
+      await lastValueFrom(this.client.emit('post.react', message));
+      console.log('Message sent successfully');
     } catch (error) {
-      console.error('❌ Error sending message to Kafka:', error);
+      console.error('Error sending message to Kafka:', error);
       throw error;
     }
   }
 
-  async emitCommentEvent(postId: string, userId: string, type: 'new_comment') {
+  async emitCommentEvent(postId: string, userId: string, postOwnerId: string) {
     try {
-      await lastValueFrom(this.client.emit('comment', {
+      await lastValueFrom(this.client.emit('post.comment', {
         postId,
         userId,
-        type,
+        postOwnerId,
       }));
-      console.log('✅ Comment event sent');
+      console.log('Comment event sent');
     } catch (err) {
-      console.error('❌ Kafka emit failed:', err);
+      console.error('Kafka emit failed:', err);
+    }
+  }
+
+  async emitReplyEvent(postId: string, userId: string, postOwnerId: string, parentCommentId: string, replyToUserId: string) {
+    try {
+      await lastValueFrom(this.client.emit('post.reply', {
+        postId,
+        userId,
+        postOwnerId,
+        parentCommentId,
+        replyToUserId
+      }));
+      console.log('reply event sent');
+    } catch (err) {
+      console.error('Kafka emit failed:', err);
     }
   }
 }

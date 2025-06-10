@@ -6,12 +6,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { configuration } from './config/configuration';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CommentModule } from './comment/comment.module';
+import { GrpcControllerModule } from './grpc/grpc.module';
 
 @Module({
   imports: [
     ReactModule,
     GrpcAuthModule,
-
+    GrpcControllerModule,
     ConfigModule.forRoot({
       envFilePath:
         '/home/user/NodeJs/Demo Project/Social_Media/interaction/bin/env.local',

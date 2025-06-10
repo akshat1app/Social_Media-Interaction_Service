@@ -4,6 +4,7 @@ package post;
 
 service PostService {
   rpc ValidatePost (ValidatePostRequest) returns (ValidatePostResponse);
+  rpc GetPostInteractionCounts (GetPostInteractionCountsRequest) returns (GetPostInteractionCountsResponse);
 }
 
 message ValidatePostRequest {
@@ -13,4 +14,13 @@ message ValidatePostRequest {
 message ValidatePostResponse {
   bool exists = 1;
   string userId = 2; // post owner id (for notification)
+}
+
+message GetPostInteractionCountsRequest {
+  string postId = 1;
+}
+
+message GetPostInteractionCountsResponse {
+  int32 reactionCount = 1;
+  int32 commentCount = 2;
 }

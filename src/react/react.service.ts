@@ -8,6 +8,7 @@ import { React, ReactDocument } from './schema/react.schema';
 import { ReactDto } from './dto/react.dto';
 import { UnreactDto } from './dto/unreact.dto';
 import { KafkaProducerService } from 'src/kafka/kafka.service';
+import { GrpcService } from '../grpc/grpc.service';
 
 @Injectable()
 export class ReactService {
@@ -15,24 +16,25 @@ export class ReactService {
   constructor(
     @InjectModel(React.name) private reactModel: Model<ReactDocument>,
     private readonly kafkaProducerService: KafkaProducerService,
+    private readonly grpcService: GrpcService,
   ) {}
   
 
   async reactToPost(userId: string, dto: ReactDto) {
     const { postId, type } = dto;
+    let postOwnerId: string;
 
     // 1. Validate post existence via gRPC
-    // try {
-    //   const result = await lastValueFrom(
-    //     this.postService.ValidatePost({ postId }),
-    //   );
-
-    //   if (!result?.exists) {
-    //     throw new NotFoundException('Post does not exist');
-    //   }
-    // } catch (err) {
-    //   throw new NotFoundException('Post validation failed');
-    // }
+    try {
+      const result = await this.grpcService.validatePost(postId);
+      if (!result.exists) {
+        throw new NotFoundException('Post does not exist');
+      }
+      postOwnerId = result.userId;
+      console.log(postOwnerId)
+    } catch (err) {
+      throw new NotFoundException('Post validation failed');
+    }
 
     // 2. Save or update the reaction
     let like = await this.reactModel.findOne({ postId });
@@ -52,7 +54,7 @@ export class ReactService {
       }
       await like.save();
     }
-    const postOwnerId = 'some-user-id';
+
     console.log("reacted")
     await this.kafkaProducerService.emitLikeEvent(postId, userId, postOwnerId);
 
