@@ -9,7 +9,25 @@ async function bootstrap() {
   // Create HTTP app
   const app = await NestFactory.create(InteractionModule);
   
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  // Enable CORS
+  app.enableCors({
+    origin: '*', // Replace with your frontend URL
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
+
+  // Enable validation pipe globally
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Strip properties that don't have decorators
+      transform: true, // Transform payloads to DTO instances
+      forbidNonWhitelisted: true, // Throw errors if non-whitelisted properties are present
+      transformOptions: {
+        enableImplicitConversion: true, // Automatically convert primitive types
+      },
+    }),
+  );
 
   const config = new DocumentBuilder()
     .setTitle('Interaction Service API')
@@ -20,6 +38,9 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
+
+  // Global prefix (optional)
+  app.setGlobalPrefix('api/v1');
 
   // Create gRPC microservice
   const microservice = await NestFactory.createMicroservice<MicroserviceOptions>(
@@ -43,12 +64,12 @@ async function bootstrap() {
 
   // Start both servers
   await Promise.all([
-    app.listen(process.env.PORT ?? 8080),
+    app.listen(process.env.port ?? 3008),
     microservice.listen()
   ]);
 
-  console.log(`🚀 Interaction Service HTTP server is running on port ${process.env.PORT ?? 3000}`);
+  console.log(`🚀 Interaction Service is running at http://localhost:${process.env.port ?? 3008}`);
   console.log(`🚀 Interaction Service gRPC server is running on port 50056`);
-  console.log(`📚 Swagger documentation is available at http://localhost:${process.env.PORT ?? 3000}/api`);
+  console.log(`📚 Swagger documentation is available at http://localhost:${process.env.port ?? 3008}/api`);
 }
 bootstrap();
