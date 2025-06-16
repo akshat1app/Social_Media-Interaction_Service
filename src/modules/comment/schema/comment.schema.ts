@@ -9,6 +9,9 @@ export class Comment {
   @Prop({ required: true, type: Types.ObjectId })
   userId: Types.ObjectId;
 
+  @Prop({ required: true, type: String })
+  name: string;
+  
   @Prop({ required: true })
   content: string;
 
@@ -23,10 +26,13 @@ export class Comment {
   likeCount: number;
 
   @Prop({ type: [Types.ObjectId], default: [] })
-  likedBy: Types.ObjectId[];
+  likedBy: Types.ObjectId[];// userId 
 
   @Prop({ default: false })
   isEdited: boolean;
+
+  @Prop({ default: 0 })
+  replyCount: number;
 }
 
 export type CommentDocument = Comment & Document;

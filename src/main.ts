@@ -1,17 +1,19 @@
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory, Reflector } from '@nestjs/core';
 import { InteractionModule } from './interaction.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { AllExceptionsFilter } from './middleware/filter/exception.filter';
+import { ErrorInterceptor } from './middleware/interceptor/error.interceptor';
+import { SimpleResponseInterceptor } from './middleware/interceptor/response.interceptor';
 
 async function bootstrap() {
-  // Create HTTP app
   const app = await NestFactory.create(InteractionModule);
   
   // Enable CORS
   app.enableCors({
-    origin: '*', // Replace with your frontend URL
+    origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -20,13 +22,19 @@ async function bootstrap() {
   // Enable validation pipe globally
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Strip properties that don't have decorators
-      transform: true, // Transform payloads to DTO instances
-      forbidNonWhitelisted: true, // Throw errors if non-whitelisted properties are present
+      whitelist: true, 
+      transform: true,
+      forbidNonWhitelisted: true,
       transformOptions: {
-        enableImplicitConversion: true, // Automatically convert primitive types
+        enableImplicitConversion: true, 
       },
     }),
+  );
+  const httpAdapterHost = app.get(HttpAdapterHost);
+  app.useGlobalFilters(new AllExceptionsFilter(httpAdapterHost));
+  app.useGlobalInterceptors(
+    new ErrorInterceptor(),
+    new SimpleResponseInterceptor(app.get(Reflector))
   );
 
   const config = new DocumentBuilder()
@@ -39,9 +47,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Global prefix (optional)
-  app.setGlobalPrefix('api/v1');
-
   // Create gRPC microservice
   const microservice = await NestFactory.createMicroservice<MicroserviceOptions>(
     InteractionModule,
@@ -49,7 +54,7 @@ async function bootstrap() {
       transport: Transport.GRPC,
       options: {
         package: 'post',
-        protoPath: join(__dirname, '../proto/post.proto'),
+        protoPath: join(process.cwd(), 'proto/post.proto'),
         url: 'localhost:50056',
         loader: {
           keepCase: true,
@@ -68,8 +73,8 @@ async function bootstrap() {
     microservice.listen()
   ]);
 
-  console.log(`🚀 Interaction Service is running at http://localhost:${process.env.port ?? 3008}`);
-  console.log(`🚀 Interaction Service gRPC server is running on port 50056`);
-  console.log(`📚 Swagger documentation is available at http://localhost:${process.env.port ?? 3008}/api`);
+  console.log(`Interaction Service is running at http://localhost:${process.env.port ?? 3008}`);
+  console.log(`Interaction Service gRPC server is running on port 50056`);
+  console.log(`Swagger documentation is available at http://localhost:${process.env.port ?? 3008}/api`);
 }
 bootstrap();

@@ -3,9 +3,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ReactController } from './react.controller';
 import { React, ReactSchema } from './schema/react.schema';
 import { ReactService } from './react.service';
-import { GrpcAuthModule } from '../common/guard/grpc-auth.module';
+import { GrpcAuthModule } from '../../common/guard/grpc-auth.module';
 import { KafkaModule } from 'src/kafka/kafka.module';
-import { GrpcModule } from '../grpc/grpc.module';
+import { GrpcModule } from '../../grpc/grpc.module';
 
 @Module({
   imports: [

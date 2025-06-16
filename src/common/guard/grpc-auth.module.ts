@@ -11,7 +11,7 @@ import { GrpcAuthGuard } from './grpc-auth.guard';
         transport: Transport.GRPC,
         options: {
           package: 'auth',
-          protoPath: join(__dirname, '../../../proto/auth.proto'),
+          protoPath: join(process.cwd(), '/proto/auth.proto'),
           url: 'localhost:50052',
           loader: { keepCase: true },
         },

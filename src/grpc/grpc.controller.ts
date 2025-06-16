@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
-import { ReactService } from '../react/react.service';
-import { CommentService } from '../comment/comment.service';
+import { ReactService } from '../modules/react/react.service';
+import { CommentService } from '../modules/comment/comment.service';
 
 @Controller()
 export class GrpcController {
@@ -11,18 +11,21 @@ export class GrpcController {
   ) {}
 
   @GrpcMethod('PostService', 'GetPostInteractionCounts')
-  async getPostInteractionCounts(data: { postId: string }) {
+  async getPostInteractionCounts(data: { postId: string, userId: string }) {
     try {
       // Get reaction count
       const reactions = await this.reactService.getPostReactions(data.postId);
-      const reactionCount = reactions.length;
+      const reactionCount = reactions.pagination.totalReactions;
 
       // Get comment count
       const comments = await this.commentService.getCommentsByPost(data.postId);
-      const commentCount = comments.length;
+      const commentCount = comments.pagination.totalComments;
+
+      const isLiked = await this.reactService.getUserReaction(data.postId, data.userId)
       return {
         reactionCount,
-        commentCount
+        commentCount,
+        isLiked:isLiked.liked
       };
     } catch (error) {
       console.log("error")

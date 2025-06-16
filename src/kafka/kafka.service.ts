@@ -29,12 +29,13 @@ export class KafkaProducerService implements OnModuleInit {
     console.log('Kafka producer connected');
   }
 
-  async emitLikeEvent(postId: string, userId: string, postOwnerId: string) {
+  async emitLikeEvent(postId: string, userId: string, userName: string, postOwnerId: string) {
     try {
       console.log('Sending message to Kafka:', { postId, userId, postOwnerId });
       const message = {
         postId,
         userId,
+        userName,
         postOwnerId
       };
       await lastValueFrom(this.client.emit('post.react', message));
@@ -45,11 +46,12 @@ export class KafkaProducerService implements OnModuleInit {
     }
   }
 
-  async emitCommentEvent(postId: string, userId: string, postOwnerId: string) {
+  async emitCommentEvent(postId: string, userId: string, userName: string, postOwnerId: string) {
     try {
       await lastValueFrom(this.client.emit('post.comment', {
         postId,
         userId,
+        userName,
         postOwnerId,
       }));
       console.log('Comment event sent');
@@ -58,11 +60,12 @@ export class KafkaProducerService implements OnModuleInit {
     }
   }
 
-  async emitReplyEvent(postId: string, userId: string, postOwnerId: string, parentCommentId: string, replyToUserId: string) {
+  async emitReplyEvent(postId: string, userId: string, userName:string, postOwnerId: string, parentCommentId: string, replyToUserId: string) {
     try {
       await lastValueFrom(this.client.emit('post.reply', {
         postId,
         userId,
+        userName,
         postOwnerId,
         parentCommentId,
         replyToUserId
