@@ -31,7 +31,7 @@ export class KafkaProducerService implements OnModuleInit {
 
   async emitLikeEvent(postId: string, userId: string, userName: string, postOwnerId: string) {
     try {
-      console.log('Sending message to Kafka:', { postId, userId, postOwnerId });
+      console.log('Sending message to Kafka:', { postId, userId, userName, postOwnerId });
       const message = {
         postId,
         userId,
