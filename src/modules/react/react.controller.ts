@@ -112,7 +112,8 @@ export class ReactController {
                 properties: {
                   postId: { type: 'string' },
                   userId: { type: 'string' },
-                  name: { type: 'string' },
+                  username: { type: 'string' },
+                  mediaUrl: { type: 'string'},
                   reactedAt: { type: 'string', format: 'date-time' }
                 }
               }

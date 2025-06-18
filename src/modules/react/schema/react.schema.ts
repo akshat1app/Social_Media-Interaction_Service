@@ -11,9 +11,6 @@ export class React {
   @Prop({ required: true, type: Types.ObjectId })
   userId: Types.ObjectId;
 
-  @Prop({ required: true, type: String })
-  name: string;
-
   @Prop({ type: Date, default: Date.now })
   reactedAt: Date;
 }

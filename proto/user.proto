@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package user;
 
-
 service UserService {
     rpc GetUserName(GetUserNameRequest) returns (GetUserNameResponse) {}
+    rpc GetMultipleUserNames(GetMultipleUserNamesRequest) returns (GetMultipleUserNamesResponse) {}
 }
 
 message GetUserNameRequest {
@@ -14,4 +14,20 @@ message GetUserNameRequest {
 message GetUserNameResponse {
   string fullName = 1;
   string username = 2;
+  string mediaUrl = 3;
+}
+
+message GetMultipleUserNamesRequest {
+  repeated string userIds = 1;
+}
+
+message UserName {
+  string userId = 1;
+  string fullName = 2;
+  string username = 3;
+  string mediaUrl = 4;
+}
+
+message GetMultipleUserNamesResponse {
+  repeated UserName users = 1;
 }

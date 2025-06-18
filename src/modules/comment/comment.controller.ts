@@ -245,7 +245,12 @@ export class CommentController {
                   isEdited: { type: 'boolean', example: false },
                   replyCount: { type: 'number', example: 2 },
                   createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' }
+                  updatedAt: { type: 'string', format: 'date-time' },
+                  username: { type: 'string'},
+                  mediaUrl: { type: 'string'},
+                  replyToUsername: { type: 'string'},
+                  replyToMediaUrl: { type: 'string'},
+
                 }
               }
             },
@@ -318,7 +323,11 @@ export class CommentController {
                   isEdited: { type: 'boolean', example: false },
                   replyCount: { type: 'number', example: 0 },
                   createdAt: { type: 'string', format: 'date-time' },
-                  updatedAt: { type: 'string', format: 'date-time' }
+                  updatedAt: { type: 'string', format: 'date-time' },
+                  username: { type: 'string'},
+                  mediaUrl: { type: 'string'},
+                  replyToUsername: { type: 'string'},
+                  replyToMediaUrl: { type: 'string'},
                 }
               }
             },

@@ -31,7 +31,7 @@ export class CommentService {
    * @throws BadRequestException if any ID is invalid
    * @throws InternalServerErrorException if database operation fails
    */
-  async createComment(userId: string, dto: CreateCommentDto) {
+  async createComment(userId: string, dto: CreateCommentDto){
     let postOwnerId: string;
     try {
       const result = await this.grpcService.validatePost(dto.postId);
@@ -44,14 +44,6 @@ export class CommentService {
         throw err;
       }
       throw new InternalServerErrorException(ERROR.VALIDATE_POST_FAILED);
-    }
-
-    let userName: string;
-    try {
-      const user = await this.grpcService.getUserNameById(userId);
-      userName = user.username;
-    } catch (err) {
-      throw new InternalServerErrorException(ERROR.FETCH_USER_FAILED);
     }
 
     try {
@@ -72,7 +64,6 @@ export class CommentService {
       const comment = await this.commentModel.create({
         postId: new Types.ObjectId(dto.postId),
         userId: new Types.ObjectId(userId),
-        name: userName,
         content: dto.content,
         parentCommentId: dto.parentCommentId
           ? new Types.ObjectId(dto.parentCommentId)
@@ -84,10 +75,17 @@ export class CommentService {
 
       // If this is a reply, increment the parent comment's reply count
       if (dto.parentCommentId) {
-        await this.commentModel.findByIdAndUpdate(
-          dto.parentCommentId,
-          { $inc: { replyCount: 1 } }
-        );
+        await this.commentModel.findByIdAndUpdate(dto.parentCommentId, {
+          $inc: { replyCount: 1 },
+        });
+      }
+
+      let userName: string;
+      try {
+        const user = await this.grpcService.getUserNameById(userId);
+        userName = user.username;
+      } catch (err) {
+        throw new InternalServerErrorException(ERROR.FETCH_USER_FAILED);
       }
 
       try {
@@ -101,14 +99,20 @@ export class CommentService {
             dto.replyToUserId,
           );
         } else {
-          await this.kafkaService.emitCommentEvent(dto.postId, userId,userName, postOwnerId);
+          await this.kafkaService.emitCommentEvent(
+            dto.postId,
+            userId,
+            userName,
+            postOwnerId,
+          );
         }
       } catch (err) {
         // Log Kafka error but don't fail the request
         console.error('Failed to emit Kafka event:', err);
       }
 
-      return comment;
+      return comment; 
+
     } catch (err) {
       if (err instanceof BadRequestException) {
         throw err;
@@ -141,7 +145,10 @@ export class CommentService {
       await comment.save();
       return comment;
     } catch (err) {
-      if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+      if (
+        err instanceof NotFoundException ||
+        err instanceof ForbiddenException
+      ) {
         throw err;
       }
       throw new InternalServerErrorException(ERROR.EDIT_COMMENT_FAILED);
@@ -169,10 +176,9 @@ export class CommentService {
 
       // If this is a reply, decrement the parent comment's reply count
       if (comment.parentCommentId) {
-        await this.commentModel.findByIdAndUpdate(
-          comment.parentCommentId,
-          { $inc: { replyCount: -1 } }
-        );
+        await this.commentModel.findByIdAndUpdate(comment.parentCommentId, {
+          $inc: { replyCount: -1 },
+        });
       }
 
       // If this is a parent comment, delete all its replies first
@@ -181,9 +187,12 @@ export class CommentService {
       }
 
       await comment.deleteOne();
-      return ;
+      return;
     } catch (err) {
-      if (err instanceof NotFoundException || err instanceof ForbiddenException) {
+      if (
+        err instanceof NotFoundException ||
+        err instanceof ForbiddenException
+      ) {
         throw err;
       }
       throw new InternalServerErrorException(ERROR.DELETE_COMMENT_FAILED);
@@ -234,10 +243,14 @@ export class CommentService {
    * @returns Array of comments with their replies count
    * @throws InternalServerErrorException if database operation fails
    */
-  async getCommentsByPost(postId: string, page: number = 1, limit: number = 10) {
+  async getCommentsByPost(
+    postId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     try {
       const skip = (page - 1) * limit;
-
+  
       const [comments, totalComments] = await Promise.all([
         this.commentModel.aggregate([
           {
@@ -267,75 +280,164 @@ export class CommentService {
           {
             $sort: { createdAt: -1 },
           },
-          {
-            $skip: skip,
-          },
-          {
-            $limit: limit,
-          },
+          { $skip: skip },
+          { $limit: limit },
         ]),
         this.commentModel.countDocuments({
           postId: new Types.ObjectId(postId),
           parentCommentId: null,
         }),
       ]);
-
-      const remainingComments = totalComments - (page * limit);
-
+  
+      // Extract unique userIds from both userId and replyToUserId
+      const userIdSet = new Set<string>();
+      for (const c of comments) {
+        userIdSet.add(c.userId.toString());
+        if (c.replyToUserId) userIdSet.add(c.replyToUserId.toString());
+      }
+      const userIds = Array.from(userIdSet);
+  
+      // Call UserService to get usernames + mediaUrl
+      const users = await this.grpcService.getMultipleUserNamesByIds(userIds);
+      // users = [{ userId: '...', username: '...', mediaUrl: '...' }]
+      const userMap = new Map(
+        users.map((u) => [u.userId, { username: u.username, mediaUrl: u.mediaUrl }])
+      );
+  
+      // Merge usernames & mediaUrl into comments
+      const enrichedComments = comments.map((c) => {
+        const userData = userMap.get(c.userId.toString());
+        const replyToData = c.replyToUserId ? userMap.get(c.replyToUserId.toString()) : null;
+  
+        return {
+          commentId: c._id,
+          postId: c.postId,
+          userId: c.userId,
+          content: c.content,
+          parentCommentId: c.parentCommentId,
+          replyToUserId: c.replyToUserId,
+          likeCount: c.likeCount,
+          likedBy: c.likedBy,
+          isEdited: c.isEdited,
+          replyCount: c.replyCount,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+  
+          username: userData?.username || 'Unknown',
+          mediaUrl: userData?.mediaUrl || null,
+  
+          replyToUsername: replyToData?.username || (c.replyToUserId ? 'Unknown' : null),
+          replyToMediaUrl: replyToData?.mediaUrl || (c.replyToUserId ? null : null),
+        };
+      });
+  
+      const remainingComments = totalComments - page * limit;
+  
       return {
-        comments,
+        comments: enrichedComments,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalComments / limit),
           totalComments,
           remainingComments: remainingComments > 0 ? remainingComments : 0,
-          hasMore: remainingComments > 0
-        }
+          hasMore: remainingComments > 0,
+        },
       };
     } catch (err) {
       throw new InternalServerErrorException(ERROR.GET_COMMENTS_FAILED);
     }
   }
+  
 
-  /**
+    /**
    * Gets all replies for a comment
    * @param parentCommentId - The ID of the parent comment
-   * @param page - The page number to get
-   * @param limit - The number of replies per page
-   * @returns Array of reply comments
+   * @param page - The page number
+   * @param limit - Number of replies per page
+   * @returns Array of replies with usernames
    * @throws InternalServerErrorException if database operation fails
    */
-  async getRepliesByCommentId(parentCommentId: string, page: number = 1, limit: number = 10) {
-    try {
-      const skip = (page - 1) * limit;
-
-      const [replies, totalReplies] = await Promise.all([
-        this.commentModel
-          .find({
+    async getRepliesByCommentId(
+      parentCommentId: string,
+      page: number = 1,
+      limit: number = 10,
+    ) {
+      try {
+        const skip = (page - 1) * limit;
+    
+        const [replies, totalReplies] = await Promise.all([
+          this.commentModel.aggregate([
+            {
+              $match: {
+                parentCommentId: new Types.ObjectId(parentCommentId),
+              },
+            },
+            {
+              $sort: { createdAt: -1 },
+            },
+            { $skip: skip },
+            { $limit: limit },
+          ]),
+          this.commentModel.countDocuments({
             parentCommentId: new Types.ObjectId(parentCommentId),
-          })
-          .sort({ createdAt: 1 })
-          .skip(skip)
-          .limit(limit),
-        this.commentModel.countDocuments({
-          parentCommentId: new Types.ObjectId(parentCommentId),
-        }),
-      ]);
-
-      const remainingReplies = totalReplies - (page * limit);
-
-      return {
-        replies,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(totalReplies / limit),
-          totalReplies,
-          remainingReplies: remainingReplies > 0 ? remainingReplies : 0,
-          hasMore: remainingReplies > 0
+          }),
+        ]);
+    
+        // Collect unique userIds from userId and replyToUserId
+        const userIdSet = new Set<string>();
+        for (const r of replies) {
+          userIdSet.add(r.userId.toString());
+          if (r.replyToUserId) userIdSet.add(r.replyToUserId.toString());
         }
-      };
-    } catch (err) {
-      throw new InternalServerErrorException(ERROR.GET_REPLIES_FAILED);
+    
+        const userIds = Array.from(userIdSet);
+        const users = await this.grpcService.getMultipleUserNamesByIds(userIds);
+        // users = [{ userId, username, mediaUrl }]
+        const userMap = new Map(
+          users.map((u) => [u.userId, { username: u.username, mediaUrl: u.mediaUrl }])
+        );
+    
+        const enrichedReplies = replies.map((r) => {
+          const userData = userMap.get(r.userId.toString());
+          const replyToData = r.replyToUserId ? userMap.get(r.replyToUserId.toString()) : null;
+    
+          return {
+            commentId: r._id,
+            parentCommentId: r.parentCommentId,
+            postId: r.postId,
+            userId: r.userId,
+            content: r.content,
+            replyToUserId: r.replyToUserId,
+            likeCount: r.likeCount,
+            likedBy: r.likedBy,
+            isEdited: r.isEdited,
+            createdAt: r.createdAt,
+            updatedAt: r.updatedAt,
+    
+            username: userData?.username || 'Unknown',
+            mediaUrl: userData?.mediaUrl || null,
+    
+            replyToUsername: replyToData?.username || (r.replyToUserId ? 'Unknown' : null),
+            replyToMediaUrl: replyToData?.mediaUrl || (r.replyToUserId ? null : null),
+          };
+        });
+    
+        const remainingReplies = totalReplies - page * limit;
+    
+        return {
+          replies: enrichedReplies,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalReplies / limit),
+            totalReplies,
+            remainingReplies: remainingReplies > 0 ? remainingReplies : 0,
+            hasMore: remainingReplies > 0,
+          },
+        };
+      } catch (err) {
+        throw new InternalServerErrorException(ERROR.GET_REPLIES_FAILED);
+      }
     }
-  }
+    
+  
 }

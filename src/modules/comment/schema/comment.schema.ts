@@ -8,9 +8,6 @@ export class Comment {
 
   @Prop({ required: true, type: Types.ObjectId })
   userId: Types.ObjectId;
-
-  @Prop({ required: true, type: String })
-  name: string;
   
   @Prop({ required: true })
   content: string;

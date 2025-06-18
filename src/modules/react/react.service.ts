@@ -31,7 +31,7 @@ export class ReactService {
   async reactToPost(userId: string, dto: ReactDto) {
     const { postId } = dto;
     let postOwnerId: string;
-
+  
     // Validate post
     try {
       const result = await this.grpcService.validatePost(postId);
@@ -41,48 +41,61 @@ export class ReactService {
       if (err instanceof NotFoundException) throw err;
       throw new InternalServerErrorException(ERROR.VALIDATE_POST_FAILED);
     }
-    let userName: string;
-    // Get username from UserService
-    try {
-      const user = await this.grpcService.getUserNameById(userId);
-      userName = user.username;
-    } catch (err) {
-      throw new InternalServerErrorException(ERROR.FETCH_USER_FAILED);
-    }
 
+    // Check if already reacted
     try {
       const postObjectId = new Types.ObjectId(postId);
       const userObjectId = new Types.ObjectId(userId);
-
+  
       const existingLike = await this.reactModel.findOne({
         postId: postObjectId,
         userId: userObjectId,
       });
-
+  
       if (existingLike) {
         await this.reactModel.deleteOne({
           postId: postObjectId,
           userId: userObjectId,
         });
-        return {liked: false};
+        return { liked: false };
       }
-      await this.reactModel.create({
-        postId: postObjectId,
-        userId: userObjectId,
-        name: userName,
-        reactedAt: new Date(),
-      });
+      
+      // Save reaction without username
+      try {
+        await this.reactModel.create({
+          postId: postObjectId,
+          userId: userObjectId,
+          reactedAt: new Date(),
+        });
+      } catch (err) {
+        throw new InternalServerErrorException(ERROR.UPDATE_LIKE_FAILED);
+      }
+      
+      // Call UserService now for username (for notification only, not DB)
+      let userName: string;
+      let mediaURL: string;
+      try {
+        const user = await this.grpcService.getUserNameById(userId);
+        userName = user.username;
+        mediaURL = user.mediaUrl;
+      } catch (err) {
+        throw new InternalServerErrorException(ERROR.FETCH_USER_FAILED);
+      }
+    
       await this.kafkaProducerService.emitLikeEvent(
         postId,
         userId,
         userName,
+        mediaURL,
         postOwnerId,
       );
-      return {liked: true};
+  
+      return { liked: true };
     } catch (err) {
       throw new InternalServerErrorException(ERROR.UPDATE_LIKE_FAILED);
     }
   }
+  
 
   /**
    * Gets a specific user's like status for a post
@@ -141,24 +154,49 @@ export class ReactService {
       }
       throw new InternalServerErrorException(ERROR.VALIDATE_POST_FAILED);
     }
-
+  
     try {
       const postObjectId = new Types.ObjectId(postId);
-
       const skip = (page - 1) * limit;
+  
       const totalReactions = await this.reactModel.countDocuments({
         postId: postObjectId,
       });
+  
       const reactions = await this.reactModel
         .find({ postId: postObjectId })
         .sort({ reactedAt: -1 })
         .skip(skip)
         .limit(limit);
-
+  
+      // Extract unique userIds
+      const userIds = reactions.map(r => r.userId.toString());
+  
+      // Call UserService to get usernames
+      const users = await this.grpcService.getMultipleUserNamesByIds(userIds);
+      // Assume: users = [{ userId: "id1", username: "User1" }, ...]
+      const userMap = new Map(users.map(u => [
+        u.userId,
+        { username: u.username, mediaUrl: u.mediaUrl }
+      ]));
+      
+  
+      // Merge username into reactions
+      const enrichedReactions = reactions.map(r => {
+        const userData = userMap.get(r.userId.toString());
+        return {
+          postId: r.postId,
+          userId: r.userId,
+          reactedAt: r.reactedAt,
+          username: userData?.username || "Unknown",
+          mediaUrl: userData?.mediaUrl || "Unknown"
+        };
+      });
+  
       const remainingReactions = totalReactions - page * limit;
-
+  
       return {
-        reactions,
+        reactions: enrichedReactions,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalReactions / limit),
@@ -171,6 +209,7 @@ export class ReactService {
       throw new InternalServerErrorException(ERROR.GET_POST_LIKES_FAILED);
     }
   }
+  
 
   /**
    * Gets the total number of likes for a post
