@@ -81,9 +81,11 @@ export class CommentService {
       }
 
       let userName: string;
+      let mediaURL: string;
       try {
         const user = await this.grpcService.getUserNameById(userId);
         userName = user.username;
+        mediaURL = user.mediaUrl
       } catch (err) {
         throw new InternalServerErrorException(ERROR.FETCH_USER_FAILED);
       }
@@ -94,6 +96,7 @@ export class CommentService {
             dto.postId,
             userId,
             userName,
+            mediaURL,
             postOwnerId,
             dto.parentCommentId,
             dto.replyToUserId,
@@ -103,6 +106,7 @@ export class CommentService {
             dto.postId,
             userId,
             userName,
+            mediaURL,
             postOwnerId,
           );
         }

@@ -47,12 +47,13 @@ export class KafkaProducerService implements OnModuleInit {
     }
   }
 
-  async emitCommentEvent(postId: string, userId: string, userName: string ,postOwnerId: string) {
+  async emitCommentEvent(postId: string, userId: string, userName: string, mediaUrl: string, postOwnerId: string) {
     try {
       await lastValueFrom(this.client.emit('post.comment', {
         postId,
         userId,
         userName,
+        mediaUrl,
         postOwnerId,
       }));
       console.log('Comment event sent');
@@ -61,13 +62,13 @@ export class KafkaProducerService implements OnModuleInit {
     }
   }
 
-  async emitReplyEvent(postId: string, userId: string, userName:string, postOwnerId: string, parentCommentId: string, replyToUserId: string) {
+  async emitReplyEvent(postId: string, userId: string, userName:string, mediaUrl: string, postOwnerId: string, parentCommentId: string, replyToUserId: string) {
     try {
       await lastValueFrom(this.client.emit('post.reply', {
         postId,
         userId,
         userName,
-
+        mediaUrl,
         postOwnerId,
         parentCommentId,
         replyToUserId
